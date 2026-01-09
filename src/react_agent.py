@@ -6,8 +6,9 @@ import sys
 from collections import OrderedDict
 from typing import Any, Iterable, List
 
-from langchain.agents import AgentExecutor, create_react_agent
-from langchain.prompts import PromptTemplate
+from langchain.agents import create_react_agent
+from langchain_core.prompts import PromptTemplate
+from langchain_core.runnables import Runnable
 from langchain_community.tools.tavily_search import TavilySearchResults
 from langchain_openai import ChatOpenAI
 
@@ -56,22 +57,39 @@ def _dedupe_preserve_order(items: Iterable[str]) -> List[str]:
     return list(OrderedDict.fromkeys(item for item in items if item))
 
 
-def build_agent() -> AgentExecutor:
+def _extract_message_contents(messages: Iterable[Any]) -> Iterable[Any]:
+    for message in messages:
+        if isinstance(message, dict):
+            content = message.get("content")
+        else:
+            content = getattr(message, "content", None)
+        if content is not None:
+            yield content
+
+
+def build_agent() -> Runnable:
     prompt = PromptTemplate.from_template(PROMPT_TEMPLATE)
     tools = [TavilySearchResults(k=5)]
     llm = ChatOpenAI(model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"))
     agent = create_react_agent(llm=llm, tools=tools, prompt=prompt)
-    return AgentExecutor(agent=agent, tools=tools, return_intermediate_steps=True)
+    return agent
 
 
 def run_agent(prompt: str) -> dict[str, Any]:
     agent_executor = build_agent()
     result = agent_executor.invoke({"input": prompt})
     sources: List[str] = []
-    for _action, observation in result.get("intermediate_steps", []):
-        sources.extend(_extract_urls(observation))
+    if isinstance(result, dict):
+        for _action, observation in result.get("intermediate_steps", []):
+            sources.extend(_extract_urls(observation))
+        if not sources and result.get("messages"):
+            for content in _extract_message_contents(result["messages"]):
+                sources.extend(_extract_urls(content))
+        output = result.get("output", "")
+    else:
+        output = str(result)
     return {
-        "answer": result.get("output", ""),
+        "answer": output,
         "sources": _dedupe_preserve_order(sources),
     }
 
