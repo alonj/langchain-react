@@ -10,18 +10,25 @@ from pydantic import BaseModel, Field
 from pydantic_ai import Agent, RunContext
 from tavily import TavilyClient
 
+import argparse
+
 try:
-    from e2b_code_interpreter import CodeInterpreter
+    from e2b_code_interpreter import Sandbox
 except ImportError as exc:  # pragma: no cover - helpful error when deps missing
     raise SystemExit(
         "Missing dependency 'e2b-code-interpreter'. Install it to use the E2B tool."
     ) from exc
 
 
+parser = argparse.ArgumentParser(description="Run the Pydantic React Agent.")
+parser.add_argument("prompt", type=str, help="The prompt/question to ask the agent.")
+parser.add_argument("--model", type=str, default="openai:gpt-5-mini", help="The LLM model to use.")
+parser.add_argument("--output", type=str, default="output.json", help="File to write output JSON to.")
+args = parser.parse_args()
+
 @dataclass
 class AgentDeps:
     tavily: TavilyClient
-    code_interpreter: CodeInterpreter
     sources: list[str] = field(default_factory=list)
 
 
@@ -31,8 +38,8 @@ class AgentResponse(BaseModel):
 
 
 agent = Agent(
-    model=os.getenv("OPENAI_MODEL", "openai:gpt-4o-mini"),
-    result_type=AgentResponse,
+    model=args.model,
+    output_type=AgentResponse,
     system_prompt=(
         "You are a ReAct-style assistant. Use tools when helpful, and provide a concise "
         "final answer. Always include relevant source URLs when you use the web search tool."
@@ -44,6 +51,7 @@ agent = Agent(
 async def tavily_search(ctx: RunContext[AgentDeps], query: str) -> list[dict[str, Any]]:
     """Search the web with Tavily."""
     results = ctx.deps.tavily.search(query=query, max_results=5)
+    results = results["results"]
     sources = [result.get("url") for result in results if result.get("url")]
     ctx.deps.sources.extend(sources)
     return results
@@ -52,38 +60,41 @@ async def tavily_search(ctx: RunContext[AgentDeps], query: str) -> list[dict[str
 @agent.tool
 async def run_code(ctx: RunContext[AgentDeps], code: str) -> dict[str, Any]:
     """Execute Python code in an E2B sandbox."""
-    execution = ctx.deps.code_interpreter.notebook.exec_cell(code)
+    with Sandbox.create() as sandbox:
+        execution = sandbox.run_code(code)
     return {
         "stdout": getattr(execution, "stdout", ""),
         "stderr": getattr(execution, "stderr", ""),
-        "result": getattr(execution, "result", None),
+        "result": getattr(execution, "text", None),
     }
 
 
 def build_deps() -> AgentDeps:
     return AgentDeps(
         tavily=TavilyClient(api_key=os.getenv("TAVILY_API_KEY")),
-        code_interpreter=CodeInterpreter(api_key=os.getenv("E2B_API_KEY")),
     )
 
 
 def run_agent(prompt: str) -> dict[str, Any]:
     deps = build_deps()
     result = agent.run_sync(prompt, deps=deps)
-    payload = result.data.model_copy()
-    payload.sources = list(dict.fromkeys(deps.sources))
-    return payload.model_dump()
+    output = result.output
+    answer = output.answer
+    sources = list(set(output.sources))
+    return {
+        "answer": answer,
+        "sources": sources,
+    }
 
 
 def main() -> None:
-    if len(sys.argv) > 1:
-        prompt = " ".join(sys.argv[1:])
+    output = run_agent(args.prompt)
+    output_json = json.dumps(output, indent=2)
+    if args.output:
+        with open(args.output, "w") as f:
+            f.write(output_json)
     else:
-        prompt = sys.stdin.read().strip()
-    if not prompt:
-        raise SystemExit("Provide a prompt via argv or stdin.")
-    output = run_agent(prompt)
-    print(json.dumps(output, indent=2))
+        print(output_json)
 
 
 if __name__ == "__main__":
