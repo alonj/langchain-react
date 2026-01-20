@@ -1,4 +1,5 @@
 from __future__ import annotations
+import logfire
 
 import json
 import os
@@ -19,6 +20,9 @@ from e2b_code_interpreter import Sandbox
 
 import argparse
 import yaml
+
+logfire.configure()
+logfire.instrument_pydantic_ai() 
 
 parser = argparse.ArgumentParser(description="Run the Pydantic React Agent.")
 parser.add_argument("prompt", type=str, help="The prompt/question to ask the agent.")
