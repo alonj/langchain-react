@@ -17,6 +17,8 @@ from pydantic_ai.direct import model_request
 from tavily import TavilyClient
 from e2b_code_interpreter import Sandbox
 
+from data_management_tools import DataManager, build_data_management_tools
+
 import argparse
 import yaml
 
@@ -35,6 +37,7 @@ with open(os.path.join(cwd, "agents.yaml"), "r") as f:
 class AgentDeps:
     tavily: TavilyClient
     e2b: type[Sandbox]
+    data_manager: DataManager
     sources: list[str] = field(default_factory=list)
 
 
@@ -81,6 +84,7 @@ def build_deps() -> AgentDeps:
     return AgentDeps(
         tavily=TavilyClient(api_key=os.getenv("TAVILY_API_KEY")),
         e2b=Sandbox,
+        data_manager=DataManager(),
     )
 
 
@@ -113,8 +117,13 @@ async def main() -> None:
         "tavily_search": tavily_search,
         "run_code": run_code,
     }
+    tools_dict.update(build_data_management_tools())
     tools_config = prompts[args.type].get("tools", [])
-    selected_tools = [Tool(tools_dict[tool_name]) for tool_name in tools_config if tool_name in tools_dict]
+    selected_tools = [
+        tools_dict[tool_name] if isinstance(tools_dict[tool_name], Tool) else Tool(tools_dict[tool_name])
+        for tool_name in tools_config
+        if tool_name in tools_dict
+    ]
     agent = Agent(
         model=args.model,
         output_type=AgentResponse,
