@@ -5,3 +5,4 @@ tavily-python
 pydantic-ai
 pydantic-graph
 e2b-code-interpreter
+pandas
