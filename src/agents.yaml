@@ -1,4 +1,6 @@
 plan:
+  tools:
+    - tavily_search
   response_prompt: |
     Final answer to the user question which is a detailed plan.
   system_prompt: |
@@ -76,6 +78,9 @@ plan:
     Only create the process plan to answer the given question by retrieving and reasoning over information; do not provide the answer itself. Plans should be in structured JSON, following the fields above, reflecting step dependencies and possible non-linearity.
 
 answer:
+  tools:
+    - tavily_search
+    - run_code
   response_prompt: |
     Final answer to the user question.
   system_prompt: |
@@ -135,6 +140,9 @@ answer:
     Follow the provided plan precisely, executing each step with the correct tools in sequence, reasoning before concluding, and only presenting the final answer after all steps are completed.
 
 plan_and_answer:
+  tools:
+    - tavily_search
+    - run_code
   response_prompt: |
     Execution plan for the question followed by the steps solved one-by-one, and finally the answer to the user question.
   system_prompt: |
