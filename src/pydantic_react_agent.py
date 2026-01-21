@@ -3,6 +3,7 @@ import logfire
 
 import json
 import os
+from datetime import datetime, timezone
 from pydoc import text
 import sys
 import asyncio
@@ -50,6 +51,16 @@ class AgentResponse(BaseModel):
     sources: list[str] = Field(default_factory=list, description="Source URLs used.")
 
 
+class ReflectionRequest(BaseModel):
+    step: str = Field(..., description="Identifier for the step just completed.")
+    previous_step_conclusion: str = Field(..., description="Conclusion or outcome from the previous step.")
+    next_step: str = Field(..., description="Immediate next step to take.")
+    next_step_reason: str = Field(..., description="Reason for taking the next step.")
+    considerations: str = Field(..., description="Key considerations or context for the decision.")
+    metadata: dict[str, Any] | None = Field(default=None, description="Optional metadata to include.")
+    path: str = Field(default="reflections.jsonl", description="JSONL file path to append reflections to.")
+
+
 async def tavily_search(ctx: RunContext[AgentDeps], query: str) -> list[dict[str, Any]]:
     """Search the web with Tavily."""
     oai = OpenAIResponsesModel(model_name='gpt-4.1-nano', settings=ModelSettings(max_tokens=500))#, extra_body={'reasoning': {'effort': 'minimal'}}))
@@ -83,6 +94,29 @@ async def run_code(ctx: RunContext[AgentDeps], code: str) -> dict[str, Any]:
         "stderr": getattr(execution, "stderr", ""),
         "result": getattr(execution, "text", None),
     }
+
+
+async def write_reflection(ctx: RunContext[AgentDeps], request: ReflectionRequest) -> dict[str, Any]:
+    """Append a reflection entry as a JSONL line."""
+    entry = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "step": request.step,
+        "previous_step_conclusion": request.previous_step_conclusion,
+        "next_step": request.next_step,
+        "next_step_reason": request.next_step_reason,
+        "considerations": request.considerations,
+        "metadata": request.metadata or {},
+        "agent_type": args.type,
+        "model": args.model,
+        "sources_snapshot": list(ctx.deps.sources),
+    }
+    path = request.path
+    directory = os.path.dirname(path)
+    if directory:
+        os.makedirs(directory, exist_ok=True)
+    with open(path, "a", encoding="utf-8") as file:
+        file.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    return {"status": "ok", "path": path, "entry": entry}
 
 def build_deps() -> AgentDeps:
     return AgentDeps(
@@ -120,6 +154,7 @@ async def main() -> None:
     tools_dict = {
         "tavily_search": tavily_search,
         "run_code": run_code,
+        "write_reflection": write_reflection,
     }
     tools_dict.update(build_data_management_tools())
     tools_config = prompts[args.type].get("tools", [])
