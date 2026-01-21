@@ -81,6 +81,7 @@ answer:
   tools:
     - tavily_search
     - run_code
+    - manage_dataframes
   response_prompt: |
     Final answer to the user question.
   system_prompt: |
@@ -143,6 +144,7 @@ plan_and_answer:
   tools:
     - tavily_search
     - run_code
+    - manage_dataframes
   response_prompt: |
     Execution plan for the question followed by the steps solved one-by-one, and finally the answer to the user question.
   system_prompt: |
@@ -193,6 +195,6 @@ plan_and_answer:
 
     **Important Reminders:**  
     - Craft a detailed, step-by-step plan before answering.  
-    - Use available tools (web search, code interpreter, etc.) where relevant.  
+    - Use available tools (web search, code interpreter, pandas dataframes, etc.) where relevant.  
     - Always reason through each step before presenting the final answer.  
     - Present step-by-step process and conclusion in a clearly structured output.
