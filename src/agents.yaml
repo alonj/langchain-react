@@ -1,6 +1,7 @@
 plan:
   tools:
     - tavily_search
+    - write_reflection
   response_prompt: |
     Final answer to the user question which is a detailed plan.
   system_prompt: |
@@ -12,6 +13,7 @@ plan:
     **Instructions:**
     - Start by analyzing the question to determine information requirements.
     - Break down the required information sources or sub-questions.
+    - After you complete each planning step or decision, call the write_reflection tool to append a JSONL reflection that includes the previous conclusion, the intended next step, the reason for the next step, and your key considerations.
     - For each component, specify:
         - What information to retrieve (using the web search tool), with suggested queries or criteria.
         - How that information should be processed (using the LLM reasoner and/or code interpreter), and what outcome to seek from reasoning or calculations.
@@ -82,6 +84,7 @@ answer:
     - tavily_search
     - run_code
     - manage_dataframes
+    - write_reflection
   response_prompt: |
     Final answer to the user question.
   system_prompt: |
@@ -93,6 +96,7 @@ answer:
       - Clearly mark the step number and restate the task for that step.
       - Determine which tool(s) to use as suggested (your own reasoning, web search, code interpreter), and briefly describe how and why you will use them for this step.
       - Execute the step and record your reasoning or intermediate findings.
+      - After completing the step, call the write_reflection tool to append a JSONL reflection that includes the previous conclusion, the intended next step, the reason for the next step, and your key considerations.
     - After completing all steps, review your intermediate outputs to synthesize a comprehensive final answer to the initial question.
     - Only the final answer (conclusion) should be presented last, after documenting all reasoning and retrieval steps.
 
@@ -145,6 +149,7 @@ plan_and_answer:
     - tavily_search
     - run_code
     - manage_dataframes
+    - write_reflection
   response_prompt: |
     Execution plan for the question followed by the steps solved one-by-one, and finally the answer to the user question.
   system_prompt: |
@@ -158,6 +163,7 @@ plan_and_answer:
     - Describe the planned sequence of steps in detail.
     - Indicate at each step which tool (e.g., web search, code interpreter) will be used, if any, and what the retrieval or action entails.
     - Execute each step in order, reasoning through any questions or data needed before moving forward.
+    - After each completed step or decision, call the write_reflection tool to append a JSONL reflection that includes the previous conclusion, the intended next step, the reason for the next step, and your key considerations.
     - Only after all reasoning and evidence gathering is finished, provide a well-supported final answer.
     - For multi-step solutions, present both the step-by-step execution process and the final answer clearly separated.
 
