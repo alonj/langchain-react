@@ -18,9 +18,9 @@ export E2B_API_KEY=your-key
 ```
 
 Run the Pydantic AI agent with web search (Tavily) and code execution (E2B):
-
+Example:
 ```bash
-python src/pydantic_react_agent.py "What is the population of Japan?"
+python src/pydantic_react_agent.py "What was the average population of Japan between 1972 and 1978?" --model gpt-5-mini --output test.json --type plan
 ```
 
 ### Command options

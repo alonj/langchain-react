@@ -4,8 +4,6 @@ import logfire
 import json
 import os
 from datetime import datetime, timezone
-from pydoc import text
-import sys
 import asyncio
 from dataclasses import dataclass, field
 from typing import Any
@@ -61,7 +59,7 @@ class ReflectionRequest(BaseModel):
     path: str = Field(default="reflections.jsonl", description="JSONL file path to append reflections to.")
 
 
-async def tavily_search(ctx: RunContext[AgentDeps], query: str) -> list[dict[str, Any]]:
+async def tavily_search(ctx: RunContext[AgentDeps], query: str) -> str:
     """Search the web with Tavily."""
     oai = OpenAIResponsesModel(model_name='gpt-4.1-nano', settings=ModelSettings(max_tokens=500))#, extra_body={'reasoning': {'effort': 'minimal'}}))
     prompter = lambda text, max_length: f"Summarize the following text in {max_length} characters. Maintain important and salient data. We're interested in information regarding the following query: \"{query}\"\n\nText to summarize:\n{text}"
@@ -80,20 +78,22 @@ async def tavily_search(ctx: RunContext[AgentDeps], query: str) -> list[dict[str
         summary = await summarize_fun(text, max_length=500)
         result["content"] = summary
         del result["raw_content"]
-        del result["content"]
+        # del result["content"]
     ctx.deps.sources.extend(sources)
-    return results
+    return f"Summarization of search results:\n" + ' '.join([f"Result #{i+1}: {result.get('content', '')}" for i, result in enumerate(results)])
 
 
-async def run_code(ctx: RunContext[AgentDeps], code: str) -> dict[str, Any]:
+async def run_code(ctx: RunContext[AgentDeps], code: str) -> str:
     """Execute Python code in an E2B sandbox."""
     with ctx.deps.e2b.create(api_key=os.getenv("E2B_API_KEY")) as sandbox:
         execution = sandbox.run_code(code)
-    return {
-        "stdout": getattr(execution, "stdout", ""),
-        "stderr": getattr(execution, "stderr", ""),
-        "result": getattr(execution, "text", None),
-    }
+    
+    # return {
+    #     "stdout": getattr(execution, "stdout", ""),
+    #     "stderr": getattr(execution, "stderr", ""),
+    #     "result": getattr(execution, "text", None),
+    # }
+    return getattr(execution, "result", "")
 
 
 async def write_reflection(ctx: RunContext[AgentDeps], request: ReflectionRequest) -> dict[str, Any]:
